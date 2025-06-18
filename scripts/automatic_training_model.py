@@ -7,6 +7,7 @@ from tensorflow.keras.layers import LSTM, Dropout, Dense
 from tensorflow.keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.callbacks import EarlyStopping
+from keras.regularizers import l2
 
 # Paths y constantes
 KEY_POINTS_PATH = "data/model/hdf"
@@ -51,18 +52,16 @@ def execute():
     X = np.array(sequences)
     y = to_categorical(labels).astype(int)
 
-    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.10, random_state=42, shuffle=True)
-    early_stopping = EarlyStopping(monitor='accuracy', patience=10, restore_best_weights=True)
+    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.30, random_state=42, shuffle=True)
+    early_stopping = EarlyStopping(monitor='val_accuracy', patience=10, restore_best_weights=True)
 
-    model = Sequential([
-        LSTM(128, return_sequences=True, input_shape=(MAX_MODEL_FRAMES, LENGTH_KEYPOINTS)),
-        Dropout(0.3),
-        LSTM(128, return_sequences=True),
-        Dropout(0.3),
-        LSTM(64, return_sequences=False),  # Última capa sin return_sequences
-        Dropout(0.3),
-        Dense(len(tags), activation='softmax')
-    ])
+    model = Sequential()
+    model.add(LSTM(256, return_sequences=True, input_shape=(MAX_MODEL_FRAMES, LENGTH_KEYPOINTS), kernel_regularizer=l2(0.001)))
+    model.add(Dropout(0.5))
+    model.add(LSTM(128, return_sequences=True, kernel_regularizer=l2(0.001)))
+    model.add(Dropout(0.5))
+    model.add(LSTM(128, return_sequences=False, kernel_regularizer=l2(0.001)))
+    model.add(Dense(len(tags), activation='softmax'))
 
     model.compile(optimizer=Adam(learning_rate=0.0001), loss='categorical_crossentropy', metrics=['accuracy'])
     model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=30, batch_size=8, callbacks=[early_stopping])
